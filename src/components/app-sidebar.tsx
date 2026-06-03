@@ -1,0 +1,87 @@
+import { Link, useRouterState } from "@tanstack/react-router";
+import {
+  LayoutDashboard, Plus, Search, Users, Package, FileText, Shield, Smartphone,
+} from "lucide-react";
+import {
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarFooter,
+  useSidebar,
+} from "@/components/ui/sidebar";
+
+const mainItems = [
+  { title: "Dashboard", url: "/", icon: LayoutDashboard },
+  { title: "New Sale", url: "/sales", icon: Plus },
+  { title: "IMEI Search", url: "/search", icon: Search },
+];
+const manageItems = [
+  { title: "Customers", url: "/customers", icon: Users },
+  { title: "Inventory", url: "/inventory", icon: Package },
+  { title: "Warranty", url: "/warranty", icon: Shield },
+  { title: "Reports", url: "/reports", icon: FileText },
+];
+
+export function AppSidebar() {
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
+  const path = useRouterState({ select: (r) => r.location.pathname });
+  const isActive = (p: string) => (p === "/" ? path === "/" : path.startsWith(p));
+
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="border-b">
+        <div className="flex items-center gap-2 px-2 py-2">
+          <div className="size-8 rounded-md bg-primary flex items-center justify-center shrink-0">
+            <Smartphone className="size-4 text-primary-foreground" />
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">PhoneTrack</div>
+              <div className="text-[10px] text-muted-foreground truncate">IMEI Sales Module</div>
+            </div>
+          )}
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {mainItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                    <Link to={item.url}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>Manage</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {manageItems.map((item) => (
+                <SidebarMenuItem key={item.url}>
+                  <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                    <Link to={item.url}>
+                      <item.icon className="size-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter className="border-t">
+        {!collapsed && (
+          <div className="px-2 py-1 text-[10px] text-muted-foreground">v1.0 · Admin Panel</div>
+        )}
+      </SidebarFooter>
+    </Sidebar>
+  );
+}

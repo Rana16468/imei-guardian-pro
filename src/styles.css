@@ -89,8 +89,8 @@
   font-size: 0.875rem;
   outline: none;
   transition: box-shadow 0.15s, border-color 0.15s;
-}
-@utility input:focus {
-  border-color: var(--color-ring);
-  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 25%, transparent);
+  &:focus {
+    border-color: var(--color-ring);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 25%, transparent);
+  }
 }

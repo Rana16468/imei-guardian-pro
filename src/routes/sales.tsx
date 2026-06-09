@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Smartphone, Users, Receipt, ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { Smartphone, Receipt, Plus, Trash2, Pencil, Check, X, Search as SearchIcon } from "lucide-react";
 import { Sale, addSale, loadSales, saveSales, nextInvoiceNumber } from "@/lib/phone-store";
 import { fmt, PageHeader, Metric } from "@/lib/phone-ui";
 
 export const Route = createFileRoute("/sales")({
-  head: () => ({ meta: [{ title: "Stock & Sales — PhoneTrack" }] }),
+  head: () => ({ meta: [{ title: "Add Stock — PhoneTrack" }] }),
   component: StockPage,
 });
 
@@ -27,7 +27,9 @@ const blankForm = (): StockSale => ({
 function StockPage() {
   const [form, setForm] = useState<StockSale>(blankForm);
   const [rows, setRows] = useState<StockSale[]>(() => loadSales() as StockSale[]);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [editId, setEditId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<StockSale | null>(null);
+  const [q, setQ] = useState("");
 
   const set = <K extends keyof StockSale>(k: K, v: StockSale[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -41,13 +43,7 @@ function StockPage() {
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.imei) { alert("IMEI is required"); return; }
-    const record: StockSale = {
-      ...form, finalPrice,
-      warrantyExpiry: new Date(form.warrantyExpiry).toISOString(),
-      ownership: form.customerName
-        ? [{ owner: form.customerName, phone: form.customerPhone, transferDate: new Date().toISOString(), note: "First buyer" }]
-        : [],
-    };
+    const record: StockSale = { ...form, finalPrice: form.sellingPrice };
     addSale(record);
     setRows([record, ...rows]);
     setForm(blankForm());
@@ -56,13 +52,33 @@ function StockPage() {
   const remove = (id: string) => {
     if (!confirm("Delete this entry?")) return;
     const next = rows.filter((r) => r.id !== id);
-    setRows(next);
-    saveSales(next);
+    setRows(next); saveSales(next);
   };
+
+  const startEdit = (r: StockSale) => { setEditId(r.id); setDraft({ ...r }); };
+  const cancelEdit = () => { setEditId(null); setDraft(null); };
+  const saveEdit = () => {
+    if (!draft) return;
+    const next = rows.map((r) => r.id === draft.id ? draft : r);
+    setRows(next); saveSales(next);
+    cancelEdit();
+  };
+
+  const filtered = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    if (!s) return rows;
+    return rows.filter((r) =>
+      r.imei.toLowerCase().includes(s) ||
+      r.brand.toLowerCase().includes(s) ||
+      r.model.toLowerCase().includes(s) ||
+      r.buyerName.toLowerCase().includes(s) ||
+      r.invoiceNumber.toLowerCase().includes(s)
+    );
+  }, [rows, q]);
 
   return (
     <div className="p-4 md:p-6 max-w-[1280px] mx-auto">
-      <PageHeader title="Stock & Sales" subtitle="Add phone stock, then expand a row to record customer & sale details" />
+      <PageHeader title="Add Stock" subtitle="Register new phones into your inventory" />
 
       <form onSubmit={submit} className="space-y-5">
         <Section title="Phone Information" icon={Smartphone}>
@@ -82,8 +98,8 @@ function StockPage() {
 
         <div className="bg-accent/40 rounded-xl border border-primary/20 p-5 flex flex-wrap gap-6 items-center justify-between">
           <div className="flex gap-8">
-            <Metric label="Final Price" value={fmt(finalPrice)} />
-            <Metric label="Profit" value={fmt(profitAmt)} positive={profitAmt >= 0} />
+            <Metric label="Selling Price" value={fmt(form.sellingPrice || 0)} />
+            <Metric label="Expected Profit" value={fmt(profitAmt)} positive={profitAmt >= 0} />
           </div>
           <button type="submit" className="px-5 py-2.5 rounded-md bg-primary text-primary-foreground font-medium inline-flex items-center gap-2">
             <Plus className="size-4" /> Add to Stock
@@ -92,9 +108,14 @@ function StockPage() {
       </form>
 
       <div className="mt-8 bg-card rounded-xl border overflow-hidden">
-        <div className="px-5 py-3.5 border-b flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b flex items-center justify-between gap-3 flex-wrap">
           <h3 className="font-medium flex items-center gap-2"><Receipt className="size-4 text-primary" /> Stock List</h3>
-          <span className="text-xs text-muted-foreground">{rows.length} item(s)</span>
+          <div className="relative flex-1 max-w-sm">
+            <SearchIcon className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search IMEI, brand, model, buyer..."
+              className="w-full pl-9 pr-3 py-1.5 rounded-md border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-ring" />
+          </div>
+          <span className="text-xs text-muted-foreground">{filtered.length} item(s)</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -107,119 +128,63 @@ function StockPage() {
                 <th className="p-3 text-left">Buyer (Supplier)</th>
                 <th className="p-3 text-right">Purchase</th>
                 <th className="p-3 text-right">Selling</th>
-                <th className="p-3 text-center">Seller Info</th>
-                <th className="p-3"></th>
+                <th className="p-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.length === 0 && (
-                <tr><td colSpan={8} className="p-10 text-center text-muted-foreground">No stock yet. Add your first phone above.</td></tr>
+              {filtered.length === 0 && (
+                <tr><td colSpan={7} className="p-10 text-center text-muted-foreground">No stock yet. Add your first phone above.</td></tr>
               )}
-              {rows.map((r) => {
-                const open = openId === r.id;
-                return (
-                  <FragmentRow key={r.id}>
-                    <tr className="border-t hover:bg-accent/30">
+              {filtered.map((r) => {
+                const editing = editId === r.id && draft;
+                if (editing) {
+                  return (
+                    <tr key={r.id} className="border-t bg-accent/30">
                       <td className="p-3 font-mono text-xs">{r.invoiceNumber}</td>
-                      <td className="p-3 font-mono text-xs">{r.imei}</td>
-                      <td className="p-3">{r.brand} {r.model}<div className="text-xs text-muted-foreground">{r.ram} · {r.storage} · {r.color}</div></td>
-                      <td className="p-3">{r.buyerName || "—"}<div className="text-xs text-muted-foreground">{r.buyerPhone}</div></td>
-                      <td className="p-3 text-right">{fmt(r.purchasePrice)}</td>
-                      <td className="p-3 text-right font-medium">{fmt(r.finalPrice || r.sellingPrice)}</td>
-                      <td className="p-3 text-center">
-                        <button onClick={() => setOpenId(open ? null : r.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md border text-xs hover:bg-accent">
-                          {open ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
-                          Seller Info
-                        </button>
+                      <td className="p-2"><Input value={draft!.imei} onChange={(e) => setDraft({ ...draft!, imei: e.target.value })} /></td>
+                      <td className="p-2">
+                        <div className="flex gap-1">
+                          <Input value={draft!.brand} onChange={(e) => setDraft({ ...draft!, brand: e.target.value })} placeholder="Brand" />
+                          <Input value={draft!.model} onChange={(e) => setDraft({ ...draft!, model: e.target.value })} placeholder="Model" />
+                        </div>
                       </td>
-                      <td className="p-3 text-right">
-                        <button onClick={() => remove(r.id)} className="p-1.5 text-destructive hover:bg-destructive/10 rounded">
-                          <Trash2 className="size-4" />
-                        </button>
+                      <td className="p-2">
+                        <div className="flex gap-1">
+                          <Input value={draft!.buyerName} onChange={(e) => setDraft({ ...draft!, buyerName: e.target.value })} placeholder="Name" />
+                          <Input value={draft!.buyerPhone} onChange={(e) => setDraft({ ...draft!, buyerPhone: e.target.value })} placeholder="Phone" />
+                        </div>
+                      </td>
+                      <td className="p-2"><Input type="number" value={draft!.purchasePrice} onChange={(e) => setDraft({ ...draft!, purchasePrice: +e.target.value })} /></td>
+                      <td className="p-2"><Input type="number" value={draft!.sellingPrice} onChange={(e) => setDraft({ ...draft!, sellingPrice: +e.target.value })} /></td>
+                      <td className="p-3 text-center">
+                        <div className="inline-flex gap-1">
+                          <button onClick={saveEdit} className="p-1.5 rounded bg-primary text-primary-foreground"><Check className="size-4" /></button>
+                          <button onClick={cancelEdit} className="p-1.5 rounded border"><X className="size-4" /></button>
+                        </div>
                       </td>
                     </tr>
-                    {open && (
-                      <tr className="bg-muted/30">
-                        <td colSpan={8} className="p-5">
-                          <SellerInfoPanel row={r} onSave={(patch) => {
-                            const next = rows.map((x) => x.id === r.id ? { ...x, ...patch } : x);
-                            setRows(next); saveSales(next);
-                          }} />
-                        </td>
-                      </tr>
-                    )}
-                  </FragmentRow>
+                  );
+                }
+                return (
+                  <tr key={r.id} className="border-t hover:bg-accent/30">
+                    <td className="p-3 font-mono text-xs">{r.invoiceNumber}</td>
+                    <td className="p-3 font-mono text-xs">{r.imei}</td>
+                    <td className="p-3">{r.brand} {r.model}<div className="text-xs text-muted-foreground">{r.ram} · {r.storage} · {r.color}</div></td>
+                    <td className="p-3">{r.buyerName || "—"}<div className="text-xs text-muted-foreground">{r.buyerPhone}</div></td>
+                    <td className="p-3 text-right">{fmt(r.purchasePrice)}</td>
+                    <td className="p-3 text-right font-medium">{fmt(r.sellingPrice)}</td>
+                    <td className="p-3 text-center">
+                      <div className="inline-flex gap-1">
+                        <button onClick={() => startEdit(r)} className="p-1.5 rounded border hover:bg-accent" title="Edit"><Pencil className="size-4" /></button>
+                        <button onClick={() => remove(r.id)} className="p-1.5 rounded text-destructive hover:bg-destructive/10" title="Delete"><Trash2 className="size-4" /></button>
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
-  );
-}
-
-function FragmentRow({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
-}
-
-function SellerInfoPanel({ row, onSave }: { row: StockSale; onSave: (patch: Partial<StockSale>) => void }) {
-  const [f, setF] = useState<StockSale>(row);
-  const set = <K extends keyof StockSale>(k: K, v: StockSale[K]) => setF((p) => ({ ...p, [k]: v }));
-  const finalPrice = Math.max(0, (f.sellingPrice || 0) - (f.discount || 0));
-
-  const save = () => {
-    onSave({
-      customerName: f.customerName, customerPhone: f.customerPhone, nid: f.nid, address: f.address,
-      saleDate: f.saleDate, quantity: f.quantity, discount: f.discount, finalPrice,
-      paymentMethod: f.paymentMethod, salesPerson: f.salesPerson,
-      warrantyExpiry: new Date(f.warrantyExpiry).toISOString(), notes: f.notes,
-      ownership: f.customerName
-        ? [{ owner: f.customerName, phone: f.customerPhone, transferDate: new Date().toISOString(), note: "First buyer" }]
-        : [],
-    });
-    alert("Seller info saved");
-  };
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <div className="text-xs uppercase font-medium text-muted-foreground mb-3 flex items-center gap-2">
-          <Users className="size-3.5 text-primary" /> Customer Information
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Field label="Customer Name *"><Input value={f.customerName} onChange={(e) => set("customerName", e.target.value)} /></Field>
-          <Field label="Phone Number"><Input value={f.customerPhone} onChange={(e) => set("customerPhone", e.target.value)} /></Field>
-          <Field label="NID Number (optional)"><Input value={f.nid} onChange={(e) => set("nid", e.target.value)} /></Field>
-          <Field label="Address" wide><Input value={f.address} onChange={(e) => set("address", e.target.value)} /></Field>
-        </div>
-      </div>
-
-      <div>
-        <div className="text-xs uppercase font-medium text-muted-foreground mb-3 flex items-center gap-2">
-          <Receipt className="size-3.5 text-primary" /> Sale Information
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <Field label="Sale Date"><Input type="datetime-local" value={f.saleDate.slice(0, 16)} onChange={(e) => set("saleDate", new Date(e.target.value).toISOString())} /></Field>
-          <Field label="Quantity"><Input type="number" value={f.quantity} onChange={(e) => set("quantity", +e.target.value)} /></Field>
-          <Field label="Discount Amount"><Input type="number" value={f.discount || ""} onChange={(e) => set("discount", +e.target.value)} /></Field>
-          <Field label="Final Selling Price"><Input readOnly value={fmt(finalPrice)} className="bg-muted" /></Field>
-          <Field label="Payment Method">
-            <select className="input" value={f.paymentMethod} onChange={(e) => set("paymentMethod", e.target.value)}>
-              {["Cash", "Card", "Mobile Banking", "Bank Transfer", "Installment"].map((p) => <option key={p}>{p}</option>)}
-            </select>
-          </Field>
-          <Field label="Sales Person"><Input value={f.salesPerson} onChange={(e) => set("salesPerson", e.target.value)} /></Field>
-          <Field label="Warranty Expiry"><Input type="date" value={f.warrantyExpiry.slice(0, 10)} onChange={(e) => set("warrantyExpiry", e.target.value)} /></Field>
-          <Field label="Notes" wide><Input value={f.notes} onChange={(e) => set("notes", e.target.value)} /></Field>
-        </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button onClick={save} className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">
-          Save Seller Info
-        </button>
       </div>
     </div>
   );

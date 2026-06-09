@@ -1,6 +1,6 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, Plus, Search, Users, Package, FileText, Shield, Smartphone,
+  LayoutDashboard, PackagePlus, ShoppingCart, Users, Package, FileText, Shield, Smartphone,
 } from "lucide-react";
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
@@ -10,8 +10,8 @@ import {
 
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
-  { title: "New Sale", url: "/sales", icon: Plus },
-  { title: "IMEI Search", url: "/search", icon: Search },
+  { title: "Add Stock", url: "/sales", icon: PackagePlus },
+  { title: "New Sale", url: "/new-sale", icon: ShoppingCart },
 ];
 const manageItems = [
   { title: "Customers", url: "/customers", icon: Users },

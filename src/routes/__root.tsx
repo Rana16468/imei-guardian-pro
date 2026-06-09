@@ -117,10 +117,34 @@ function RootShell({ children }: { children: ReactNode }) {
 
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
-import { Bell, Search as SearchIcon } from "lucide-react";
+import { Bell, Search as SearchIcon, LogOut } from "lucide-react";
+import { useRouterState, useNavigate } from "@tanstack/react-router";
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const path = useRouterState({ select: (s) => s.location.pathname });
+  const navigate = useNavigate();
+  const isAuthPage = path === "/login";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const authed = localStorage.getItem("pt_auth") === "1";
+    if (!authed && !isAuthPage) navigate({ to: "/login" });
+  }, [path, isAuthPage, navigate]);
+
+  if (isAuthPage) {
+    return (
+      <QueryClientProvider client={queryClient}>
+        <Outlet />
+      </QueryClientProvider>
+    );
+  }
+
+  const logout = () => {
+    localStorage.removeItem("pt_auth");
+    localStorage.removeItem("pt_user");
+    navigate({ to: "/login" });
+  };
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -128,7 +152,7 @@ function RootComponent() {
         <div className="min-h-screen flex w-full bg-background">
           <AppSidebar />
           <div className="flex-1 flex flex-col min-w-0">
-            <header className="h-14 border-b bg-card flex items-center gap-3 px-4 sticky top-0 z-30">
+            <header className="h-14 border-b bg-card flex items-center gap-2 sm:gap-3 px-3 sm:px-4 sticky top-0 z-30">
               <SidebarTrigger />
               <div className="relative flex-1 max-w-md hidden sm:block">
                 <SearchIcon className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -137,10 +161,13 @@ function RootComponent() {
                   className="w-full pl-9 pr-3 py-1.5 rounded-md bg-muted border-0 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 />
               </div>
-              <div className="ml-auto flex items-center gap-3">
+              <div className="ml-auto flex items-center gap-2 sm:gap-3">
                 <button className="relative p-2 rounded-md hover:bg-muted">
                   <Bell className="size-4" />
                   <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-destructive" />
+                </button>
+                <button onClick={logout} title="Sign out" className="p-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground">
+                  <LogOut className="size-4" />
                 </button>
                 <div className="size-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-semibold">
                   AD

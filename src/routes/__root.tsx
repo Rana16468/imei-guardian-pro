@@ -87,6 +87,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Lovable App" },
       { name: "twitter:description", content: "Lovable Sales Tracker manages phone sales, customer data, and inventory in real-time." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/25c1f18f-ff44-4ac2-849b-270a23bfe00b/id-preview-adfcf0c2--aa48328d-7186-4b36-9a01-24dcd3e69812.lovable.app-1781037908632.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/25c1f18f-ff44-4ac2-849b-270a23bfe00b/id-preview-adfcf0c2--aa48328d-7186-4b36-9a01-24dcd3e69812.lovable.app-1781037908632.png" },
     ],
     links: [
       {

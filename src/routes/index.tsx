@@ -6,6 +6,8 @@ import {
 } from "recharts";
 import {
   Package, Calendar, Wallet, TrendingUp, ArrowUpRight, Plus, Receipt,
+  Smartphone, ShoppingCart, Coins, Briefcase,
+  DollarSign,
 } from "lucide-react";
 import { loadSales, seedIfEmpty, profit, Sale } from "@/lib/phone-store";
 import { fmt, PageHeader, SalesTable } from "@/lib/phone-ui";
@@ -30,14 +32,20 @@ function Dashboard() {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 
-  const monthly = sales.filter((s) => new Date(s.saleDate) >= monthStart);
-  const lastMonth = sales.filter((s) => { const d = new Date(s.saleDate); return d >= lastMonthStart && d < monthStart; });
+  const monthly = sales.filter((s) => s.customerName && new Date(s.saleDate) >= monthStart);
+  const lastMonth = sales.filter((s) => { const d = new Date(s.saleDate); return s.customerName && d >= lastMonthStart && d < monthStart; });
   const monthlyRev = monthly.reduce((a, s) => a + s.finalPrice, 0);
   const lastRev = lastMonth.reduce((a, s) => a + s.finalPrice, 0);
   const revChange = lastRev > 0 ? ((monthlyRev - lastRev) / lastRev) * 100 : 0;
 
-  const totalProfit = sales.reduce((a, s) => a + profit(s), 0);
-  const todays = sales.filter((s) => new Date(s.saleDate) >= today);
+  const totalProfit = sales.filter((s) => s.customerName).reduce((a, s) => a + profit(s), 0);
+  const todays = sales.filter((s) => s.customerName && new Date(s.saleDate) >= today);
+
+  const totalStock = sales.length;
+  const totalSold = sales.filter((s) => s.customerName).length;
+  const availableStock = totalStock - totalSold;
+  const totalInvestVal = sales.filter((s) => !s.customerName).reduce((a, s) => a + s.purchasePrice, 0);
+  const liquidCashVal = sales.filter((s) => s.customerName).reduce((a, s) => a + s.finalPrice, 0);
 
   // 14-day trend
   const trend = useMemo(() => {
@@ -58,22 +66,55 @@ function Dashboard() {
   // Top brands
   const brands = useMemo(() => {
     const map = new Map<string, number>();
-    sales.forEach((s) => map.set(s.brand || "Other", (map.get(s.brand || "Other") || 0) + 1));
+    sales.filter((s) => s.customerName).forEach((s) => map.set(s.brand || "Other", (map.get(s.brand || "Other") || 0) + 1));
     return Array.from(map, ([brand, count]) => ({ brand, count })).sort((a, b) => b.count - a.count).slice(0, 5);
   }, [sales]);
 
-  // Payment mix
-  const payments = useMemo(() => {
-    const map = new Map<string, number>();
-    sales.forEach((s) => map.set(s.paymentMethod, (map.get(s.paymentMethod) || 0) + 1));
-    return Array.from(map, ([name, value]) => ({ name, value }));
-  }, [sales]);
 
   const stats = [
-    { label: "Total Sales", value: sales.length.toString(), icon: Package, sub: `${todays.length} today`, color: "bg-primary/10 text-primary" },
-    { label: "Monthly Revenue", value: fmt(monthlyRev), icon: Wallet, sub: revChange >= 0 ? `+${revChange.toFixed(1)}%` : `${revChange.toFixed(1)}%`, color: "bg-success/10 text-success", trend: revChange },
-    { label: "Total Profit", value: fmt(totalProfit), icon: TrendingUp, sub: "All time", color: "bg-warning/10 text-warning" },
-    { label: "Active Warranties", value: sales.filter((s) => new Date(s.warrantyExpiry) > new Date()).length.toString(), icon: Calendar, sub: "Under coverage", color: "bg-accent text-accent-foreground" },
+    {
+      label: "Total Stock",
+      value: totalStock.toString(),
+      sub: `${availableStock} available`,
+      icon: Smartphone,
+      color: "bg-blue-500/10 text-blue-600",
+    },
+    {
+      label: "Total Sold",
+      value: totalSold.toString(),
+      sub: "All-time transactions",
+      icon: ShoppingCart,
+      color: "bg-emerald-500/10 text-emerald-600",
+    },
+    {
+      label: "Monthly Sales",
+      value: fmt(monthlyRev),
+      sub: revChange >= 0 ? `+${revChange.toFixed(1)}%` : `${revChange.toFixed(1)}%`,
+      icon: Wallet,
+      color: "bg-violet-500/10 text-violet-600",
+      trend: revChange,
+    },
+    {
+      label: "Total Profit",
+      value: fmt(totalProfit),
+      sub: "Net earnings",
+      icon: TrendingUp,
+      color: "bg-green-500/10 text-green-600",
+    },
+    {
+      label: "Liquid Cash",
+      value: fmt(monthlyRev),
+      sub: "Cash inflow",
+      icon: DollarSign,
+      color: "bg-teal-500/10 text-teal-600",
+    },
+    {
+      label: "Total Invested",
+      value: fmt(totalInvestVal),
+      sub: "Active stock cost",
+      icon: Briefcase,
+      color: "bg-blue-500/10 text-blue-600",
+    },
   ];
 
   return (
@@ -85,23 +126,40 @@ function Dashboard() {
       </PageHeader>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-5 mb-6">
         {stats.map((s) => {
           const Icon = s.icon;
           return (
-            <div key={s.label} className="bg-card rounded-xl border p-5">
-              <div className="flex items-start justify-between mb-3">
-                <div className={`size-9 rounded-lg ${s.color} flex items-center justify-center`}>
-                  <Icon className="size-4" />
+            <div
+              key={s.label}
+              className="bg-card rounded-xl border p-6 transition-all duration-300 hover:shadow-md hover:-translate-y-0.5 hover:border-primary/30 flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`size-11 rounded-xl ${s.color} flex items-center justify-center shadow-sm`}>
+                    <Icon className="size-5" />
+                  </div>
+                  {s.trend !== undefined && (
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-0.5 ${
+                        s.trend >= 0
+                          ? "bg-success/15 text-success"
+                          : "bg-destructive/15 text-destructive"
+                      }`}
+                    >
+                      <ArrowUpRight className={`size-3.5 ${s.trend < 0 ? "rotate-90" : ""}`} />
+                      {Math.abs(s.trend).toFixed(0)}%
+                    </span>
+                  )}
                 </div>
-                {s.trend !== undefined && (
-                  <span className={`text-xs px-2 py-0.5 rounded-full inline-flex items-center gap-0.5 ${s.trend >= 0 ? "bg-success/15 text-success" : "bg-destructive/15 text-destructive"}`}>
-                    <ArrowUpRight className={`size-3 ${s.trend < 0 ? "rotate-90" : ""}`} /> {Math.abs(s.trend).toFixed(0)}%
-                  </span>
-                )}
+                <div className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                  {s.value}
+                </div>
               </div>
-              <div className="text-2xl font-semibold tracking-tight">{s.value}</div>
-              <div className="text-xs text-muted-foreground mt-1">{s.label} · <span>{s.sub}</span></div>
+              <div className="mt-3">
+                <div className="text-xl font-semibold text-muted-foreground">{s.label}</div>
+              
+              </div>
             </div>
           );
         })}
@@ -112,7 +170,7 @@ function Dashboard() {
         <div className="bg-card rounded-xl border p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-semibold">Revenue & Profit (14 days)</h3>
+              <h3 className="font-semibold">Revenue & Profit (Monthly)</h3>
               <p className="text-xs text-muted-foreground">Daily sales trend</p>
             </div>
             <div className="flex gap-3 text-xs">
@@ -142,53 +200,72 @@ function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-card rounded-xl border p-5">
-          <h3 className="font-semibold mb-1">Payment Methods</h3>
-          <p className="text-xs text-muted-foreground mb-4">Distribution of sales</p>
-          {payments.length > 0 ? (
-            <>
-              <ResponsiveContainer width="100%" height={180}>
-                <PieChart>
-                  <Pie data={payments} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={2}>
-                    {payments.map((_, i) => <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />)}
-                  </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid oklch(0.91 0.01 255)", fontSize: 12 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="space-y-1.5 mt-2">
-                {payments.map((p, i) => (
-                  <div key={p.name} className="flex items-center justify-between text-xs">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="size-2 rounded-full" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
-                      {p.name}
-                    </span>
-                    <span className="font-medium">{p.value}</span>
-                  </div>
-                ))}
+        <div className="bg-card rounded-xl border p-5 flex flex-col justify-between">
+          <div>
+            <h3 className="font-semibold mb-1">Top Sales Brands</h3>
+            <p className="text-xs text-muted-foreground mb-4">Distribution of units sold</p>
+          </div>
+          {brands.length > 0 ? (
+            <div className="flex-1 flex flex-col justify-center">
+              <div className="relative flex items-center justify-center h-[160px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={brands}
+                      dataKey="count"
+                      nameKey="brand"
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={52}
+                      outerRadius={72}
+                      paddingAngle={3}
+                      cornerRadius={3}
+                    >
+                      {brands.map((_, i) => (
+                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} className="focus:outline-none" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{
+                        borderRadius: 8,
+                        border: "1px solid oklch(0.91 0.01 255)",
+                        fontSize: 12,
+                        backgroundColor: "var(--color-card)",
+                        color: "var(--color-foreground)",
+                      }}
+                      formatter={(v: number) => [`${v} sold`, "Volume"]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="absolute flex flex-col items-center justify-center pointer-events-none select-none text-center">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">Total Sold</span>
+                  <span className="text-2xl font-extrabold text-foreground leading-none mt-0.5">{totalSold}</span>
+                </div>
               </div>
-            </>
-          ) : <div className="text-sm text-muted-foreground py-12 text-center">No data</div>}
+              
+              <div className="grid grid-cols-2 gap-2 mt-4">
+                {brands.map((b, i) => {
+                  const percentage = totalSold > 0 ? Math.round((b.count / totalSold) * 100) : 0;
+                  return (
+                    <div key={b.brand} className="flex items-center gap-2 p-2 rounded-lg bg-muted/30 border border-muted/50 transition-all hover:bg-muted/50">
+                      <span className="size-2.5 rounded-full shrink-0" style={{ background: CHART_COLORS[i % CHART_COLORS.length] }} />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-foreground truncate">{b.brand}</div>
+                        <div className="text-[10px] text-muted-foreground font-medium">{b.count} {b.count === 1 ? "unit" : "units"} ({percentage}%)</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground py-12 text-center flex-1 flex items-center justify-center">No data</div>
+          )}
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4 mb-6">
+      <div className="mb-6">
         <div className="bg-card rounded-xl border p-5">
-          <h3 className="font-semibold mb-1">Top Brands</h3>
-          <p className="text-xs text-muted-foreground mb-4">Units sold</p>
-          {brands.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
-              <BarChart data={brands} layout="vertical" margin={{ left: 10 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.01 255)" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 11, fill: "oklch(0.5 0.02 260)" }} tickLine={false} axisLine={false} />
-                <YAxis dataKey="brand" type="category" tick={{ fontSize: 11, fill: "oklch(0.3 0.03 260)" }} tickLine={false} axisLine={false} width={70} />
-                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid oklch(0.91 0.01 255)", fontSize: 12 }} />
-                <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 6, 6, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : <div className="text-sm text-muted-foreground py-12 text-center">No data</div>}
-        </div>
-
-        <div className="bg-card rounded-xl border p-5 lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-semibold">Recent Sales</h3>
@@ -196,22 +273,11 @@ function Dashboard() {
             </div>
             <Link to="/search" className="text-xs text-primary hover:underline">View all →</Link>
           </div>
-          <SalesTable sales={sales.slice(0, 5)} compact />
+          <SalesTable sales={sales.slice(0, 5)} />
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl border p-5 flex flex-wrap items-center gap-4 justify-between">
-        <div className="flex items-center gap-3">
-          <div className="size-10 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
-            <Receipt className="size-5" />
-          </div>
-          <div>
-            <div className="font-semibold">Need to record a new sale?</div>
-            <div className="text-xs text-muted-foreground">Capture IMEI, customer details, and auto-generate an invoice in one flow.</div>
-          </div>
-        </div>
-        <Link to="/sales" className="px-4 py-2 rounded-md bg-primary text-primary-foreground text-sm font-medium">Start New Sale</Link>
-      </div>
+
     </div>
   );
 }

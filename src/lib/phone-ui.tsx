@@ -3,7 +3,7 @@ import React from "react";
 import { Receipt, Users, Wallet, Shield, X } from "lucide-react";
 
 export function fmt(n: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+  return "Tk " + new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(n);
 }
 export function download(name: string, content: string, type: string) {
   const blob = new Blob([content], { type });

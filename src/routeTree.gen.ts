@@ -13,6 +13,7 @@ import { Route as WarrantyRouteImport } from './routes/warranty'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SalesRouteImport } from './routes/sales'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as PartnerRouteImport } from './routes/partner'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as GadgetRouteImport } from './routes/gadget'
@@ -38,6 +39,11 @@ const SalesRoute = SalesRouteImport.update({
 const ReportsRoute = ReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PartnerRoute = PartnerRouteImport.update({
+  id: '/partner',
+  path: '/partner',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -78,6 +84,7 @@ export interface FileRoutesByFullPath {
   '/gadget': typeof GadgetRoute
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
+  '/partner': typeof PartnerRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
   '/search': typeof SearchRoute
@@ -90,6 +97,7 @@ export interface FileRoutesByTo {
   '/gadget': typeof GadgetRoute
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
+  '/partner': typeof PartnerRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
   '/search': typeof SearchRoute
@@ -103,6 +111,7 @@ export interface FileRoutesById {
   '/gadget': typeof GadgetRoute
   '/inventory': typeof InventoryRoute
   '/login': typeof LoginRoute
+  '/partner': typeof PartnerRoute
   '/reports': typeof ReportsRoute
   '/sales': typeof SalesRoute
   '/search': typeof SearchRoute
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/gadget'
     | '/inventory'
     | '/login'
+    | '/partner'
     | '/reports'
     | '/sales'
     | '/search'
@@ -129,6 +139,7 @@ export interface FileRouteTypes {
     | '/gadget'
     | '/inventory'
     | '/login'
+    | '/partner'
     | '/reports'
     | '/sales'
     | '/search'
@@ -141,6 +152,7 @@ export interface FileRouteTypes {
     | '/gadget'
     | '/inventory'
     | '/login'
+    | '/partner'
     | '/reports'
     | '/sales'
     | '/search'
@@ -154,6 +166,7 @@ export interface RootRouteChildren {
   GadgetRoute: typeof GadgetRoute
   InventoryRoute: typeof InventoryRoute
   LoginRoute: typeof LoginRoute
+  PartnerRoute: typeof PartnerRoute
   ReportsRoute: typeof ReportsRoute
   SalesRoute: typeof SalesRoute
   SearchRoute: typeof SearchRoute
@@ -188,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/reports'
       fullPath: '/reports'
       preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/partner': {
+      id: '/partner'
+      path: '/partner'
+      fullPath: '/partner'
+      preLoaderRoute: typeof PartnerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -242,6 +262,7 @@ const rootRouteChildren: RootRouteChildren = {
   GadgetRoute: GadgetRoute,
   InventoryRoute: InventoryRoute,
   LoginRoute: LoginRoute,
+  PartnerRoute: PartnerRoute,
   ReportsRoute: ReportsRoute,
   SalesRoute: SalesRoute,
   SearchRoute: SearchRoute,

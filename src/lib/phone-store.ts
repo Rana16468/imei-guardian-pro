@@ -174,3 +174,78 @@ function inStockDemoItems(): Sale[] {
     },
   ];
 }
+
+export type PartnerTransaction = {
+  id: string;
+  partner: "Mehedi" | "Rauf";
+  amount: number;
+  type: "Investment" | "Withdrawal";
+  date: string; // ISO date string
+  notes: string;
+};
+
+export type ShopExpense = {
+  id: string;
+  category: string;
+  amount: number;
+  date: string; // ISO date string
+  notes: string;
+};
+
+const PARTNER_KEY = "partner_transactions_v1";
+const EXPENSE_KEY = "shop_expenses_v1";
+
+export function loadPartnerTransactions(): PartnerTransaction[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const data = localStorage.getItem(PARTNER_KEY);
+    if (!data) {
+      const initial: PartnerTransaction[] = [
+        { id: "p1", partner: "Mehedi", amount: 500000, type: "Investment", date: "2026-05-01T10:00:00.000Z", notes: "Initial shop setup capital" },
+        { id: "p2", partner: "Rauf", amount: 400000, type: "Investment", date: "2026-05-02T10:00:00.000Z", notes: "Initial shop setup capital" },
+        { id: "p3", partner: "Mehedi", amount: 100000, type: "Investment", date: "2026-05-15T14:30:00.000Z", notes: "Extra inventory purchase" },
+        { id: "p4", partner: "Rauf", amount: 200000, type: "Investment", date: "2026-05-20T11:15:00.000Z", notes: "Extra inventory purchase" },
+        { id: "p5", partner: "Mehedi", amount: 50000, type: "Withdrawal", date: "2026-06-05T18:00:00.000Z", notes: "Personal emergency withdrawal" },
+        { id: "p6", partner: "Rauf", amount: 30000, type: "Withdrawal", date: "2026-06-06T15:45:00.000Z", notes: "Personal utility payment" },
+      ];
+      localStorage.setItem(PARTNER_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export function savePartnerTransactions(txs: PartnerTransaction[]) {
+  localStorage.setItem(PARTNER_KEY, JSON.stringify(txs));
+}
+
+export function loadShopExpenses(): ShopExpense[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const data = localStorage.getItem(EXPENSE_KEY);
+    if (!data) {
+      const initial: ShopExpense[] = [
+        { id: "e1", category: "Rent", amount: 20000, date: "2026-05-01T09:00:00.000Z", notes: "Shop Rent (May)" },
+        { id: "e2", category: "Internet", amount: 1500, date: "2026-05-05T12:00:00.000Z", notes: "Broadband Bill (May)" },
+        { id: "e3", category: "Electricity", amount: 4500, date: "2026-05-10T16:00:00.000Z", notes: "PDB Electricity Bill (May)" },
+        { id: "e4", category: "Salary", amount: 10000, date: "2026-05-28T18:00:00.000Z", notes: "Sales Assistant salary (May)" },
+        { id: "e5", category: "Others", amount: 2000, date: "2026-05-12T14:00:00.000Z", notes: "Tea & snacks for customers" },
+        { id: "e6", category: "Rent", amount: 20000, date: "2026-06-01T09:00:00.000Z", notes: "Shop Rent (June)" },
+        { id: "e7", category: "Internet", amount: 1500, date: "2026-06-05T12:00:00.000Z", notes: "Broadband Bill (June)" },
+        { id: "e8", category: "Electricity", amount: 4800, date: "2026-06-10T15:30:00.000Z", notes: "PDB Electricity Bill (June)" },
+        { id: "e9", category: "Salary", amount: 12000, date: "2026-06-11T18:00:00.000Z", notes: "Sales Assistant salary + sales commission (June)" },
+      ];
+      localStorage.setItem(EXPENSE_KEY, JSON.stringify(initial));
+      return initial;
+    }
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+export function saveShopExpenses(exps: ShopExpense[]) {
+  localStorage.setItem(EXPENSE_KEY, JSON.stringify(exps));
+}

@@ -108,9 +108,7 @@ function Reports() {
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-card rounded-xl border">
-        <SalesTable sales={filtered} />
-      </div>
+
     </div>
   );
 }

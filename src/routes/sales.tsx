@@ -1,8 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
-import { Smartphone, Receipt, Plus, Trash2, Pencil, Check, X, Search as SearchIcon, Eye, Info, User, DollarSign } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import {
+  Smartphone, Receipt, Plus, Trash2, Pencil, Check, X, Search as SearchIcon,
+  Eye, Info, User, DollarSign, ShoppingCart, ArrowLeft, ChevronRight, Sparkles,
+  ChevronDown, ChevronUp, Printer, Cpu, HardDrive, Palette, Barcode, CheckCircle2,
+  BadgeDollarSign
+} from "lucide-react";
 import { Sale, addSale, loadSales, saveSales, nextInvoiceNumber } from "@/lib/phone-store";
-import { fmt, PageHeader, Metric } from "@/lib/phone-ui";
+import { fmt, PageHeader, Metric, CustomerMemoModal } from "@/lib/phone-ui";
 
 export const Route = createFileRoute("/sales")({
   head: () => ({ meta: [{ title: "Add Stock — PhoneTrack" }] }),
@@ -31,6 +36,86 @@ function StockPage() {
   const [draft, setDraft] = useState<StockSale | null>(null);
   const [q, setQ] = useState("");
   const [viewItem, setViewItem] = useState<StockSale | null>(null);
+
+  /* wizard state */
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [step, setStep] = useState<"pick" | "customer">("pick");
+  const [wizardQ, setWizardQ] = useState("");
+  const [pickedPhone, setPickedPhone] = useState<Sale | null>(null);
+  const [customerForm, setCustomerForm] = useState<ReturnType<typeof blankCustomer> | null>(null);
+  const [successId, setSuccessId] = useState<string | null>(null);
+  const [showSuccessMemo, setShowSuccessMemo] = useState(false);
+  const [memoSale, setMemoSale] = useState<Sale | null>(null);
+
+  const availablePhones = useMemo(() => {
+    const wq = wizardQ.trim().toLowerCase();
+    const inStock = rows.filter((r) => !r.customerName);
+    if (!wq) return inStock;
+    return inStock.filter((r) =>
+      r.imei?.toLowerCase().includes(wq) ||
+      r.brand?.toLowerCase().includes(wq) ||
+      r.model?.toLowerCase().includes(wq) ||
+      r.color?.toLowerCase().includes(wq) ||
+      r.barcode?.toLowerCase().includes(wq) ||
+      r.storage?.toLowerCase().includes(wq)
+    );
+  }, [rows, wizardQ]);
+
+  const updateRow = (id: string, patch: Partial<Sale>) => {
+    const next = rows.map((r) => (r.id === id ? { ...r, ...patch } : r));
+    setRows(next as StockSale[]);
+    saveSales(next);
+  };
+
+  const openWizard = () => {
+    setWizardOpen(true);
+    setStep("pick");
+    setWizardQ("");
+    setPickedPhone(null);
+    setCustomerForm(null);
+    setSuccessId(null);
+  };
+
+  const startSale = (phone: Sale) => {
+    setPickedPhone(phone);
+    setCustomerForm(blankCustomer(phone));
+    setStep("customer");
+    setWizardOpen(true);
+    setSuccessId(null);
+  };
+
+  const confirmSale = () => {
+    if (!pickedPhone || !customerForm) return;
+    if (!customerForm.customerName.trim()) { alert("Customer name is required"); return; }
+    const fp = Math.max(0, customerForm.finalPrice || 0);
+    const disc = Math.max(0, pickedPhone.sellingPrice - fp);
+    const days = Math.max(0, customerForm.warrantyDays || 0);
+    const warrantyExpiry = new Date(Date.now() + days * 86400000).toISOString();
+    const patch: Partial<Sale> = {
+      ...customerForm,
+      saleDate: new Date().toISOString(),
+      finalPrice: fp,
+      discount: disc,
+      warrantyExpiry,
+      invoiceNumber: nextInvoiceNumber(),
+      ownership: [{ owner: customerForm.customerName, phone: customerForm.customerPhone, transferDate: new Date().toISOString(), note: "First buyer" }],
+    };
+    updateRow(pickedPhone.id, patch);
+    setSuccessId(pickedPhone.id);
+    setStep("pick"); // reset to show success
+  };
+
+  const closeWizard = () => {
+    setWizardOpen(false);
+    setPickedPhone(null);
+    setCustomerForm(null);
+    setWizardQ("");
+    setSuccessId(null);
+  };
+
+  const setCustomer = <K extends keyof ReturnType<typeof blankCustomer>>(
+    k: K, v: ReturnType<typeof blankCustomer>[K]
+  ) => setCustomerForm((f) => f ? { ...f, [k]: v } : f);
 
   const set = <K extends keyof StockSale>(k: K, v: StockSale[K]) =>
     setForm((f) => ({ ...f, [k]: v }));
@@ -77,9 +162,34 @@ function StockPage() {
     );
   }, [rows, q]);
 
+  /* scroll pagination state */
+  const [visibleCount, setVisibleCount] = useState(4);
+
+  useEffect(() => {
+    setVisibleCount(4);
+  }, [q]);
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 20) {
+      if (visibleCount < filtered.length) {
+        setVisibleCount((prev) => Math.min(prev + 4, filtered.length));
+      }
+    }
+  };
+
   return (
     <div className="p-4 md:p-6 max-w-[1280px] mx-auto">
-      <PageHeader title="Add Stock" subtitle="Register new phones into your inventory" />
+      <PageHeader title="Add Stock" subtitle="Register, edit, sell, and delete devices in inventory">
+        <button
+          onClick={openWizard}
+          className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 text-white font-semibold text-sm shadow-md hover:bg-emerald-700 active:scale-[0.98] transition-all duration-200 overflow-hidden cursor-pointer"
+        >
+          <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+          <ShoppingCart className="size-4.5" />
+          Add New Sale
+        </button>
+      </PageHeader>
 
       <form onSubmit={submit} className="bg-card rounded-xl border overflow-hidden shadow-sm">
         {/* Form Header */}
@@ -251,9 +361,9 @@ function StockPage() {
           <span className="text-xs text-muted-foreground">{filtered.length} item(s)</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="max-h-[380px] overflow-y-auto overflow-x-auto" onScroll={handleScroll}>
           <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+            <thead className="bg-muted/95 backdrop-blur-sm text-xs uppercase text-muted-foreground sticky top-0 z-10 shadow-[inset_0_-1px_0_rgba(0,0,0,0.05)]">
               <tr>
                 <th className="p-3 text-left">Invoice</th>
                 <th className="p-3 text-left">IMEI</th>
@@ -268,7 +378,7 @@ function StockPage() {
               {filtered.length === 0 && (
                 <tr><td colSpan={7} className="p-10 text-center text-muted-foreground">No stock yet. Add your first phone above.</td></tr>
               )}
-              {filtered.map((r) => {
+              {filtered.slice(0, visibleCount).map((r) => {
                 return (
                   <tr key={r.id} onClick={() => setViewItem(r)} className="border-t hover:bg-accent/20 cursor-pointer transition-colors">
                     <td className="p-3 font-mono text-xs text-primary font-medium">{r.invoiceNumber}</td>
@@ -284,23 +394,24 @@ function StockPage() {
                     <td className="p-3 text-right text-muted-foreground">{fmt(r.purchasePrice)}</td>
                     <td className="p-3 text-right font-semibold text-foreground">{fmt(r.sellingPrice)}</td>
                     <td className="p-3 text-center">
-                      <div className="inline-flex gap-1.5">
+                      <div className="inline-flex gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      
                         <button
-                          onClick={(e) => { e.stopPropagation(); setViewItem(r); }}
+                          onClick={() => setViewItem(r)}
                           className="p-1.5 rounded-md border hover:bg-accent transition-all cursor-pointer shadow-sm hover:border-primary/30"
                           title="View specifications"
                         >
                           <Eye className="size-4 text-muted-foreground" />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); startEdit(r); }}
+                          onClick={() => startEdit(r)}
                           className="p-1.5 rounded-md border hover:bg-accent transition-all cursor-pointer shadow-sm hover:border-primary/30"
                           title="Edit specifications"
                         >
                           <Pencil className="size-4 text-foreground" />
                         </button>
                         <button
-                          onClick={(e) => { e.stopPropagation(); remove(r.id); }}
+                          onClick={() => remove(r.id)}
                           className="p-1.5 rounded-md text-destructive hover:bg-destructive/10 transition-all cursor-pointer"
                           title="Delete from stock"
                         >
@@ -314,6 +425,19 @@ function StockPage() {
             </tbody>
           </table>
         </div>
+
+        {filtered.length > 0 && (
+          <div className="px-5 py-3 border-t bg-muted/20 text-center text-xs text-muted-foreground flex justify-between items-center select-none">
+            <span>Showing {Math.min(visibleCount, filtered.length)} of {filtered.length} items</span>
+            {visibleCount < filtered.length ? (
+              <span className="animate-pulse flex items-center gap-1 text-primary font-medium">
+                <ChevronDown className="size-3.5" /> Scroll down to load more
+              </span>
+            ) : (
+              <span className="text-muted-foreground/60">All items loaded</span>
+            )}
+          </div>
+        )}
       </div>
 
       {viewItem && (
@@ -334,6 +458,34 @@ function StockPage() {
           onSave={saveEdit}
           onClose={cancelEdit}
         />
+      )}
+
+      {/* ── Add New Sale Wizard ─────────────────────── */}
+      {wizardOpen && (
+        <NewSaleWizard
+          step={step}
+          available={availablePhones}
+          wizardQ={wizardQ}
+          setWizardQ={setWizardQ}
+          pickedPhone={pickedPhone}
+          customerForm={customerForm}
+          setCustomer={setCustomer}
+          onPickPhone={startSale}
+          onBack={() => setStep("pick")}
+          onConfirm={confirmSale}
+          onClose={closeWizard}
+          successId={successId}
+          totalAvailable={availablePhones.length}
+          onPrintMemo={() => setShowSuccessMemo(true)}
+        />
+      )}
+
+      {showSuccessMemo && rows.find((r) => r.id === successId) && (
+        <CustomerMemoModal sale={rows.find((r) => r.id === successId)!} onClose={() => setShowSuccessMemo(false)} />
+      )}
+
+      {memoSale && (
+        <CustomerMemoModal sale={memoSale} onClose={() => setMemoSale(null)} />
       )}
     </div>
   );
@@ -655,5 +807,381 @@ function EditStockModal({
         </div>
       </div>
     </div>
+  );
+}
+
+/* ─── Wizard Helper Functions & Components ───────────────── */
+type WizardStep = "pick" | "customer";
+
+function blankCustomer(phone: Sale) {
+  return {
+    customerName: "",
+    customerPhone: "",
+    altPhone: "",
+    email: "",
+    nid: "",
+    address: "",
+    saleDate: new Date().toISOString(),
+    quantity: 1,
+    discount: 0,
+    finalPrice: phone.sellingPrice,
+    paymentMethod: "Cash",
+    salesPerson: "",
+    warrantyDays: 365,
+    warrantyExpiry: new Date(Date.now() + 365 * 86400000).toISOString(),
+    notes: "",
+  };
+}
+
+function StepDot({ n, label, active, done }: { n: number; label: string; active: boolean; done: boolean }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className={`size-6 rounded-full flex items-center justify-center text-xs font-bold transition-all ${done ? "bg-primary text-primary-foreground" :
+          active ? "bg-primary text-primary-foreground ring-4 ring-primary/20" :
+            "bg-muted text-muted-foreground"
+        }`}>
+        {done ? <Check className="size-3.5" /> : n}
+      </div>
+      <span className={`text-xs font-medium transition-colors ${active || done ? "text-foreground" : "text-muted-foreground"}`}>{label}</span>
+    </div>
+  );
+}
+
+function WFormSection({ icon: Icon, label, children }: { icon: any; label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b">
+        <Icon className="size-3.5 text-primary" />
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{label}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function WField({ label, children, wide }: { label: string; children: React.ReactNode; wide?: boolean }) {
+  return (
+    <label className={`flex flex-col gap-1.5 ${wide ? "sm:col-span-2" : ""}`}>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function WInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <input
+      {...props}
+      className={`w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all placeholder:text-muted-foreground/50 ${props.className || ""}`}
+    />
+  );
+}
+
+function NewSaleWizard({
+  step, available, wizardQ, setWizardQ, pickedPhone, customerForm, setCustomer,
+  onPickPhone, onBack, onConfirm, onClose, successId, totalAvailable, onPrintMemo,
+}: {
+  step: WizardStep;
+  available: Sale[];
+  wizardQ: string;
+  setWizardQ: (v: string) => void;
+  pickedPhone: Sale | null;
+  customerForm: ReturnType<typeof blankCustomer> | null;
+  setCustomer: <K extends keyof ReturnType<typeof blankCustomer>>(k: K, v: ReturnType<typeof blankCustomer>[K]) => void;
+  onPickPhone: (p: Sale) => void;
+  onBack: () => void;
+  onConfirm: () => void;
+  onClose: () => void;
+  successId: string | null;
+  totalAvailable: number;
+  onPrintMemo: () => void;
+}) {
+  const autoDiscount = pickedPhone && customerForm
+    ? Math.max(0, pickedPhone.sellingPrice - (customerForm.finalPrice || 0))
+    : 0;
+  const displayFinal = customerForm?.finalPrice ?? 0;
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" onClick={onClose} />
+
+      {/* Modal */}
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div
+          className="bg-card w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl border overflow-hidden flex flex-col pointer-events-auto animate-in zoom-in-95 fade-in duration-200"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Modal header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
+            <div className="flex items-center gap-3">
+              <div className="size-9 rounded-xl bg-primary/10 flex items-center justify-center">
+                <Sparkles className="size-4.5 text-primary" />
+              </div>
+              <div>
+                <h2 className="font-bold text-foreground">New Sale</h2>
+                <p className="text-xs text-muted-foreground">
+                  {successId
+                    ? "Sale completed successfully"
+                    : step === "pick"
+                      ? `Select a phone from ${totalAvailable} available`
+                      : "Enter customer details"}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="size-8 rounded-lg hover:bg-muted flex items-center justify-center transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {/* Step indicator */}
+          {!successId && (
+            <div className="flex items-center gap-0 px-6 pt-4 pb-0">
+              <StepDot n={1} label="Select Phone" active={step === "pick"} done={step === "customer"} />
+              <div className={`flex-1 h-px mx-2 transition-colors ${step === "customer" ? "bg-primary" : "bg-muted"}`} />
+              <StepDot n={2} label="Customer Info" active={step === "customer"} done={false} />
+            </div>
+          )}
+
+          {/* ── Success state ───────────────────────── */}
+          {successId && (
+            <div className="flex-1 flex flex-col items-center justify-center py-14 px-8 text-center gap-4">
+              <div className="size-20 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                <CheckCircle2 className="size-10 text-emerald-500" />
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-foreground">Sale Confirmed!</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  The phone has been sold and the record has been updated.
+                </p>
+              </div>
+              <div className="flex gap-2.5 mt-2 flex-wrap justify-center">
+                <button
+                  onClick={onPrintMemo}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-all cursor-pointer shadow-md shadow-primary/20"
+                >
+                  <Printer className="size-4" /> Print Customer Memo
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2.5 rounded-xl border font-semibold text-sm hover:bg-muted transition-all cursor-pointer text-muted-foreground hover:text-foreground"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 1: Pick Phone ──────────────────── */}
+          {!successId && step === "pick" && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="px-6 pt-4 pb-3">
+                <div className="relative">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <input
+                    id="wizard-search"
+                    autoFocus
+                    type="text"
+                    value={wizardQ}
+                    onChange={(e) => setWizardQ(e.target.value)}
+                    placeholder="Search by IMEI, brand, model, color, storage…"
+                    className="w-full pl-10 pr-9 py-2.5 rounded-xl border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                  />
+                  {wizardQ && (
+                    <button onClick={() => setWizardQ("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
+                      <X className="size-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 pb-6 space-y-2">
+                {available.length === 0 && (
+                  <div className="py-16 text-center text-muted-foreground">
+                    <Smartphone className="size-10 mx-auto mb-3 opacity-30" />
+                    <p className="text-sm font-medium">No available phones found</p>
+                    <p className="text-xs opacity-60 mt-1">Try a different search term</p>
+                  </div>
+                )}
+                {available.map((phone) => (
+                  <button
+                    key={phone.id}
+                    onClick={() => onPickPhone(phone)}
+                    className="w-full text-left group flex items-center gap-4 p-4 rounded-xl border bg-card hover:border-primary/40 hover:bg-primary/3 hover:shadow-sm transition-all duration-150"
+                  >
+                    <div className="size-11 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center shrink-0">
+                      <Smartphone className="size-5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-foreground truncate">{phone.brand} {phone.model}</div>
+                      <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        {phone.ram && <span className="text-xs text-muted-foreground flex items-center gap-1"><Cpu className="size-2.5" />{phone.ram}</span>}
+                        {phone.storage && <span className="text-xs text-muted-foreground flex items-center gap-1"><HardDrive className="size-2.5" />{phone.storage}</span>}
+                        {phone.color && <span className="text-xs text-muted-foreground flex items-center gap-1"><Palette className="size-2.5" />{phone.color}</span>}
+                      </div>
+                      {phone.imei && (
+                        <div className="text-[10px] font-mono text-muted-foreground/60 mt-1 flex items-center gap-1">
+                          <Barcode className="size-2.5" />{phone.imei}
+                        </div>
+                      )}
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-xs text-muted-foreground">Selling</div>
+                      <div className="font-bold text-primary">{fmt(phone.sellingPrice)}</div>
+                    </div>
+                    <ChevronRight className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Step 2: Customer Info ───────────────── */}
+          {!successId && step === "customer" && pickedPhone && customerForm && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              {/* Selected phone summary */}
+              <div className="mx-6 mt-4 mb-3 flex items-center gap-3 px-4 py-3 rounded-xl bg-primary/5 border border-primary/15">
+                <div className="size-9 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Smartphone className="size-4.5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-foreground truncate">{pickedPhone.brand} {pickedPhone.model}</div>
+                  <div className="text-xs text-muted-foreground">{[pickedPhone.color, pickedPhone.ram, pickedPhone.storage].filter(Boolean).join(" · ")}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-[10px] text-muted-foreground">Purchase</div>
+                  <div className="font-bold text-foreground">{fmt(pickedPhone.purchasePrice)}</div>
+                  <button onClick={onBack} className="text-[10px] text-muted-foreground hover:text-primary underline transition-colors">Change</button>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-6 pb-2 space-y-5">
+                {/* Customer section */}
+                <WFormSection icon={User} label="Customer Information">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <WField label="Customer Name *">
+                      <WInput autoFocus value={customerForm.customerName} onChange={(e) => setCustomer("customerName", e.target.value)} placeholder="Full name" />
+                    </WField>
+                    <WField label="Phone Number *">
+                      <WInput value={customerForm.customerPhone} onChange={(e) => setCustomer("customerPhone", e.target.value)} placeholder="+880..." />
+                    </WField>
+                    <WField label="NID (optional)">
+                      <WInput value={customerForm.nid} onChange={(e) => setCustomer("nid", e.target.value)} placeholder="National ID number" />
+                    </WField>
+                    <WField label="Address">
+                      <WInput value={customerForm.address} onChange={(e) => setCustomer("address", e.target.value)} placeholder="City, district" />
+                    </WField>
+                  </div>
+                </WFormSection>
+
+                {/* Sale section */}
+                <WFormSection icon={BadgeDollarSign} label="Sale Details">
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <WField label="Sale Date (auto)">
+                      <div className="px-3 py-2 rounded-lg border bg-muted/40 text-sm font-medium text-muted-foreground flex items-center justify-between h-[38px]">
+                        <span>
+                          {new Date(customerForm.saleDate || Date.now()).toLocaleString("en-GB", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            hour12: true,
+                          })}
+                        </span>
+                        <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded-full uppercase tracking-wider">
+                          Auto
+                        </span>
+                      </div>
+                    </WField>
+                    <WField label="Payment Method">
+                      <select
+                        className="w-full px-3 py-2 rounded-lg border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+                        value={customerForm.paymentMethod}
+                        onChange={(e) => setCustomer("paymentMethod", e.target.value)}
+                      >
+                        {["Cash", "Card", "Mobile Banking", "Bank Transfer", "Installment"].map((p) => (
+                          <option key={p}>{p}</option>
+                        ))}
+                      </select>
+                    </WField>
+                    <WField label="Final Price (Tk) *">
+                      <WInput
+                        type="number"
+                        value={customerForm.finalPrice || ""}
+                        onChange={(e) => setCustomer("finalPrice", +e.target.value)}
+                        placeholder={String(pickedPhone.sellingPrice)}
+                        className="font-semibold"
+                      />
+                    </WField>
+                    <WField label="Discount (auto)">
+                      <div className="px-3 py-2 rounded-lg border bg-muted/40 text-sm font-medium text-muted-foreground flex items-center justify-between">
+                        <span>{autoDiscount > 0 ? `- ${fmt(autoDiscount)}` : "No discount"}</span>
+                        {autoDiscount > 0 && <span className="text-[10px] text-emerald-600 font-semibold bg-emerald-500/10 px-1.5 py-0.5 rounded-full">{((autoDiscount / pickedPhone.sellingPrice) * 100).toFixed(1)}% off</span>}
+                      </div>
+                    </WField>
+                    <WField label="Sales Person">
+                      <WInput value={customerForm.salesPerson} onChange={(e) => setCustomer("salesPerson", e.target.value)} placeholder="Staff name" />
+                    </WField>
+                    <WField label="Warranty (days)">
+                      <div className="flex flex-col gap-1">
+                        <WInput
+                          type="number"
+                          min="0"
+                          value={customerForm.warrantyDays ?? 365}
+                          onChange={(e) => {
+                            const d = Math.max(0, +e.target.value);
+                            const expiry = new Date(Date.now() + d * 86400000).toISOString();
+                            setCustomer("warrantyDays", d);
+                            setCustomer("warrantyExpiry", expiry);
+                          }}
+                          placeholder="e.g. 365"
+                        />
+                        <span className="text-[10px] text-muted-foreground pl-1">
+                          Expires: {new Date(Date.now() + (customerForm.warrantyDays ?? 365) * 86400000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                        </span>
+                      </div>
+                    </WField>
+                    <WField label="Notes" wide>
+                      <WInput value={customerForm.notes} onChange={(e) => setCustomer("notes", e.target.value)} placeholder="Any remarks (optional)" />
+                    </WField>
+                  </div>
+                </WFormSection>
+              </div>
+
+              {/* Confirm footer */}
+              <div className="px-6 py-4 border-t bg-muted/10 flex items-center justify-between gap-3 flex-wrap">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total: </span>
+                  <span className="font-bold text-lg text-foreground">{fmt(displayFinal)}</span>
+                  {autoDiscount > 0 && (
+                    <span className="ml-2 text-xs text-muted-foreground line-through">{fmt(pickedPhone.sellingPrice)}</span>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onBack}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border text-sm font-medium hover:bg-muted transition-all cursor-pointer"
+                  >
+                    <ArrowLeft className="size-4" /> Back
+                  </button>
+                  <button
+                    id="confirm-sale-btn"
+                    onClick={onConfirm}
+                    className="group relative inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-sm shadow-md hover:opacity-95 active:scale-[0.98] transition-all overflow-hidden cursor-pointer"
+                  >
+                    <span className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
+                    <Check className="size-4" /> Confirm Sale
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
   );
 }

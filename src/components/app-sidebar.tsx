@@ -11,9 +11,10 @@ import {
 const mainItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Add Stock", url: "/sales", icon: PackagePlus },
-  { title: "New Sale", url: "/new-sale", icon: ShoppingCart },
+  { title: "All Stocks & Sales", url: "/all-stocks", icon: Package },
 ];
 const manageItems = [
+  { title: "Manage Gadget", url: "/gadget", icon: PackagePlus },
   { title: "Customers", url: "/customers", icon: Users },
   { title: "Inventory", url: "/inventory", icon: Package },
   { title: "Warranty", url: "/warranty", icon: Shield },
@@ -60,7 +61,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Manage</SidebarGroupLabel>
+          <SidebarGroupLabel>Manage Gadget</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {manageItems.map((item) => (

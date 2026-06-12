@@ -40,6 +40,8 @@ function Dashboard() {
 
   const totalProfit = sales.filter((s) => s.customerName).reduce((a, s) => a + profit(s), 0);
   const todays = sales.filter((s) => s.customerName && new Date(s.saleDate) >= today);
+  const todayRevenue = todays.reduce((a, s) => a + s.finalPrice, 0);
+  const todayProfit = todays.reduce((a, s) => a + profit(s), 0);
 
   const totalStock = sales.length;
   const totalSold = sales.filter((s) => s.customerName).length;
@@ -76,6 +78,7 @@ function Dashboard() {
       label: "Total Stock",
       value: totalStock.toString(),
       sub: `${availableStock} available`,
+      todaySub: `${availableStock} in stock today`,
       icon: Smartphone,
       color: "bg-blue-500/10 text-blue-600",
     },
@@ -83,6 +86,7 @@ function Dashboard() {
       label: "Total Sold",
       value: totalSold.toString(),
       sub: "All-time transactions",
+      todaySub: todays.length > 0 ? `${todays.length} sold today` : "No sales today",
       icon: ShoppingCart,
       color: "bg-emerald-500/10 text-emerald-600",
     },
@@ -90,6 +94,7 @@ function Dashboard() {
       label: "Monthly Sales",
       value: fmt(monthlyRev),
       sub: revChange >= 0 ? `+${revChange.toFixed(1)}%` : `${revChange.toFixed(1)}%`,
+      todaySub: todayRevenue > 0 ? `Today: ${fmt(todayRevenue)}` : "No revenue today",
       icon: Wallet,
       color: "bg-violet-500/10 text-violet-600",
       trend: revChange,
@@ -98,13 +103,15 @@ function Dashboard() {
       label: "Total Profit",
       value: fmt(totalProfit),
       sub: "Net earnings",
+      todaySub: todayProfit > 0 ? `Today: ${fmt(todayProfit)}` : "No profit today",
       icon: TrendingUp,
       color: "bg-green-500/10 text-green-600",
     },
     {
       label: "Liquid Cash",
-      value: fmt(monthlyRev),
+      value: fmt(liquidCashVal),
       sub: "Cash inflow",
+      todaySub: todayRevenue > 0 ? `+${fmt(todayRevenue)} today` : "No cash today",
       icon: DollarSign,
       color: "bg-teal-500/10 text-teal-600",
     },
@@ -112,6 +119,7 @@ function Dashboard() {
       label: "Total Invested",
       value: fmt(totalInvestVal),
       sub: "Active stock cost",
+      todaySub: `${availableStock} unsold unit${availableStock !== 1 ? "s" : ""}`,
       icon: Briefcase,
       color: "bg-blue-500/10 text-blue-600",
     },
@@ -141,24 +149,26 @@ function Dashboard() {
                   </div>
                   {s.trend !== undefined && (
                     <span
-                      className={`text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-0.5 ${
-                        s.trend >= 0
+                      className={`text-xs font-semibold px-2.5 py-0.5 rounded-full inline-flex items-center gap-0.5 ${s.trend >= 0
                           ? "bg-success/15 text-success"
                           : "bg-destructive/15 text-destructive"
-                      }`}
+                        }`}
                     >
                       <ArrowUpRight className={`size-3.5 ${s.trend < 0 ? "rotate-90" : ""}`} />
                       {Math.abs(s.trend).toFixed(0)}%
                     </span>
                   )}
                 </div>
-                <div className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                <div className="text-xl font-bold tracking-tight text-foreground sm:text-2xl text-gray-600">
                   {s.value}
                 </div>
               </div>
               <div className="mt-3">
                 <div className="text-xl font-semibold text-muted-foreground">{s.label}</div>
-              
+                <span className="text-xs text-muted-foreground/70 inline-flex items-center gap-1 mt-0.5">
+                  <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  {s.todaySub}
+                </span>
               </div>
             </div>
           );
@@ -242,7 +252,7 @@ function Dashboard() {
                   <span className="text-2xl font-extrabold text-foreground leading-none mt-0.5">{totalSold}</span>
                 </div>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-2 mt-4">
                 {brands.map((b, i) => {
                   const percentage = totalSold > 0 ? Math.round((b.count / totalSold) * 100) : 0;

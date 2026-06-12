@@ -94,3 +94,31 @@
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-ring) 25%, transparent);
   }
 }
+
+@media print {
+  /* Hide every element on the page */
+  body * {
+    visibility: hidden;
+  }
+  /* Show only the print-area container and its children */
+  .print-area, .print-area * {
+    visibility: visible;
+  }
+  /* Position the print-area container at the top left of the printed page */
+  .print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    color: black !important;
+  }
+  /* Hide interactive/modal headers and buttons when printing */
+  .print-hide {
+    display: none !important;
+  }
+}

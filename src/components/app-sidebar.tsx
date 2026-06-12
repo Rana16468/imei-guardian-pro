@@ -14,7 +14,7 @@ const mainItems = [
   { title: "All Stocks & Sales", url: "/all-stocks", icon: Package },
 ];
 const manageItems = [
-  { title: "Manage Gadget", url: "/gadget", icon: PackagePlus },
+  { title: "All Gadget Stock & Sell", url: "/gadget", icon: PackagePlus },
   { title: "Customers", url: "/customers", icon: Users },
   { title: "Inventory", url: "/inventory", icon: Package },
   { title: "Warranty", url: "/warranty", icon: Shield },
@@ -36,15 +36,15 @@ export function AppSidebar() {
           </div>
           {!collapsed && (
             <div className="min-w-0">
-              <div className="font-semibold text-sm truncate">PhoneTrack</div>
-              <div className="text-[10px] text-muted-foreground truncate">IMEI Sales Module</div>
+              <div className="font-bold tracking-wide text-xl ">Phone Bazar</div>
+
             </div>
           )}
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel>Main</SidebarGroupLabel>
+          <SidebarGroupLabel>Manage Phones</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {mainItems.map((item) => (
@@ -61,7 +61,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Manage Gadget</SidebarGroupLabel>
+          <SidebarGroupLabel>Manage Gadgets</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {manageItems.map((item) => (

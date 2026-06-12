@@ -7,7 +7,7 @@ import {
 import {
   Package, Calendar, Wallet, TrendingUp, ArrowUpRight, Plus, Receipt,
   Smartphone, ShoppingCart, Coins, Briefcase,
-  DollarSign,
+  DollarSign, Eye, EyeOff,
 } from "lucide-react";
 import { loadSales, seedIfEmpty, profit, Sale } from "@/lib/phone-store";
 import { fmt, PageHeader, SalesTable } from "@/lib/phone-ui";
@@ -24,21 +24,79 @@ export const Route = createFileRoute("/")({
 
 const CHART_COLORS = ["oklch(0.5 0.18 260)", "oklch(0.62 0.17 155)", "oklch(0.75 0.16 75)", "oklch(0.58 0.22 25)", "oklch(0.55 0.15 200)"];
 
+const MONTHS = [
+  { label: "January", value: 0 },
+  { label: "February", value: 1 },
+  { label: "March", value: 2 },
+  { label: "April", value: 3 },
+  { label: "May", value: 4 },
+  { label: "June", value: 5 },
+  { label: "July", value: 6 },
+  { label: "August", value: 7 },
+  { label: "September", value: 8 },
+  { label: "October", value: 9 },
+  { label: "November", value: 10 },
+  { label: "December", value: 11 }
+];
+
 function Dashboard() {
   const [sales, setSales] = useState<Sale[]>([]);
+  const [showInvested, setShowInvested] = useState(false);
+  const [viewMode, setViewMode] = useState<"yearly" | "monthly">("monthly");
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   useEffect(() => { seedIfEmpty(); setSales(loadSales()); }, []);
 
-  const today = new Date(); today.setHours(0, 0, 0, 0);
-  const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const years = useMemo(() => {
+    const allYears = sales.map((s) => new Date(s.saleDate).getFullYear());
+    const uniqueYears = Array.from(new Set(allYears));
+    const currentYear = new Date().getFullYear();
+    if (!uniqueYears.includes(currentYear)) {
+      uniqueYears.push(currentYear);
+    }
+    return uniqueYears.sort((a, b) => b - a);
+  }, [sales]);
 
-  const monthly = sales.filter((s) => s.customerName && new Date(s.saleDate) >= monthStart);
-  const lastMonth = sales.filter((s) => { const d = new Date(s.saleDate); return s.customerName && d >= lastMonthStart && d < monthStart; });
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Monthly logic
+  const monthStart = new Date(selectedYear, selectedMonth, 1);
+  const monthEnd = new Date(selectedYear, selectedMonth + 1, 0, 23, 59, 59, 999);
+  const lastMonthStart = new Date(selectedYear, selectedMonth - 1, 1);
+  const lastMonthEnd = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+
+  const monthly = sales.filter((s) => {
+    const d = new Date(s.saleDate);
+    return s.customerName && d >= monthStart && d <= monthEnd;
+  });
+  const lastMonth = sales.filter((s) => {
+    const d = new Date(s.saleDate);
+    return s.customerName && d >= lastMonthStart && d <= lastMonthEnd;
+  });
   const monthlyRev = monthly.reduce((a, s) => a + s.finalPrice, 0);
   const lastRev = lastMonth.reduce((a, s) => a + s.finalPrice, 0);
   const revChange = lastRev > 0 ? ((monthlyRev - lastRev) / lastRev) * 100 : 0;
+  const selectedMonthProfit = monthly.reduce((a, s) => a + profit(s), 0);
 
-  const totalProfit = sales.filter((s) => s.customerName).reduce((a, s) => a + profit(s), 0);
+  // Yearly logic
+  const yearStart = new Date(selectedYear, 0, 1);
+  const yearEnd = new Date(selectedYear, 11, 31, 23, 59, 59, 999);
+  const lastYearStart = new Date(selectedYear - 1, 0, 1);
+  const lastYearEnd = new Date(selectedYear - 1, 11, 31, 23, 59, 59, 999);
+
+  const yearlySales = sales.filter((s) => {
+    const d = new Date(s.saleDate);
+    return s.customerName && d >= yearStart && d <= yearEnd;
+  });
+  const lastYearSales = sales.filter((s) => {
+    const d = new Date(s.saleDate);
+    return s.customerName && d >= lastYearStart && d <= lastYearEnd;
+  });
+  const yearlyRev = yearlySales.reduce((a, s) => a + s.finalPrice, 0);
+  const lastYearRev = lastYearSales.reduce((a, s) => a + s.finalPrice, 0);
+  const yoyRevChange = lastYearRev > 0 ? ((yearlyRev - lastYearRev) / lastYearRev) * 100 : 0;
+  const yearlyProfit = yearlySales.reduce((a, s) => a + profit(s), 0);
+
   const todays = sales.filter((s) => s.customerName && new Date(s.saleDate) >= today);
   const todayRevenue = todays.reduce((a, s) => a + s.finalPrice, 0);
   const todayProfit = todays.reduce((a, s) => a + profit(s), 0);
@@ -49,21 +107,49 @@ function Dashboard() {
   const totalInvestVal = sales.filter((s) => !s.customerName).reduce((a, s) => a + s.purchasePrice, 0);
   const liquidCashVal = sales.filter((s) => s.customerName).reduce((a, s) => a + s.finalPrice, 0);
 
-  // 14-day trend
+  // Trend data: dynamically switch between Yearly (monthly aggregates) and Monthly (daily aggregates)
   const trend = useMemo(() => {
-    const days: { day: string; revenue: number; profit: number }[] = [];
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() - i);
-      const next = new Date(d); next.setDate(next.getDate() + 1);
-      const dayS = sales.filter((s) => { const x = new Date(s.saleDate); return x >= d && x < next; });
-      days.push({
-        day: d.toLocaleDateString("en", { month: "short", day: "numeric" }),
-        revenue: dayS.reduce((a, s) => a + s.finalPrice, 0),
-        profit: dayS.reduce((a, s) => a + profit(s), 0),
+    if (viewMode === "yearly") {
+      return MONTHS.map((m) => {
+        const monthSales = sales.filter((s) => {
+          const d = new Date(s.saleDate);
+          return (
+            s.customerName &&
+            d.getFullYear() === selectedYear &&
+            d.getMonth() === m.value
+          );
+        });
+
+        return {
+          day: m.label,
+          revenue: monthSales.reduce((a, s) => a + s.finalPrice, 0),
+          profit: monthSales.reduce((a, s) => a + profit(s), 0),
+        };
       });
+    } else {
+      const days: { day: string; revenue: number; profit: number }[] = [];
+      const totalDays = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+
+      for (let i = 1; i <= totalDays; i++) {
+        const d = new Date(selectedYear, selectedMonth, i);
+        d.setHours(0, 0, 0, 0);
+        const next = new Date(selectedYear, selectedMonth, i + 1);
+        next.setHours(0, 0, 0, 0);
+
+        const dayS = sales.filter((s) => {
+          const x = new Date(s.saleDate);
+          return s.customerName && x >= d && x < next;
+        });
+
+        days.push({
+          day: `${i} ${d.toLocaleDateString("en", { month: "short" })}`,
+          revenue: dayS.reduce((a, s) => a + s.finalPrice, 0),
+          profit: dayS.reduce((a, s) => a + profit(s), 0),
+        });
+      }
+      return days;
     }
-    return days;
-  }, [sales]);
+  }, [sales, viewMode, selectedMonth, selectedYear]);
 
   // Top brands
   const brands = useMemo(() => {
@@ -83,25 +169,27 @@ function Dashboard() {
       color: "bg-blue-500/10 text-blue-600",
     },
     {
-      label: "Total Sold",
-      value: totalSold.toString(),
-      sub: "All-time transactions",
+      label: viewMode === "yearly" ? "Yearly Sold" : "Monthly Sold",
+      value: viewMode === "yearly" ? yearlySales.length.toString() : monthly.length.toString(),
+      sub: viewMode === "yearly" ? "Yearly transactions" : "Monthly transactions",
       todaySub: todays.length > 0 ? `${todays.length} sold today` : "No sales today",
       icon: ShoppingCart,
       color: "bg-emerald-500/10 text-emerald-600",
     },
     {
-      label: "Monthly Sales",
-      value: fmt(monthlyRev),
-      sub: revChange >= 0 ? `+${revChange.toFixed(1)}%` : `${revChange.toFixed(1)}%`,
+      label: viewMode === "yearly" ? "Yearly Sales" : "Monthly Sales",
+      value: viewMode === "yearly" ? fmt(yearlyRev) : fmt(monthlyRev),
+      sub: viewMode === "yearly"
+        ? (yoyRevChange >= 0 ? `+${yoyRevChange.toFixed(1)}% YoY` : `${yoyRevChange.toFixed(1)}% YoY`)
+        : (revChange >= 0 ? `+${revChange.toFixed(1)}% MoM` : `${revChange.toFixed(1)}% MoM`),
       todaySub: todayRevenue > 0 ? `Today: ${fmt(todayRevenue)}` : "No revenue today",
       icon: Wallet,
       color: "bg-violet-500/10 text-violet-600",
-      trend: revChange,
+      trend: viewMode === "yearly" ? yoyRevChange : revChange,
     },
     {
-      label: "Total Profit",
-      value: fmt(totalProfit),
+      label: viewMode === "yearly" ? "Yearly Profit" : "Monthly Profit",
+      value: viewMode === "yearly" ? fmt(yearlyProfit) : fmt(selectedMonthProfit),
       sub: "Net earnings",
       todaySub: todayProfit > 0 ? `Today: ${fmt(todayProfit)}` : "No profit today",
       icon: TrendingUp,
@@ -158,8 +246,19 @@ function Dashboard() {
                       {Math.abs(s.trend).toFixed(0)}%
                     </span>
                   )}
+                  {s.label === "Total Invested" && (
+                    <button
+                      onClick={() => setShowInvested(!showInvested)}
+                      className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                      title={showInvested ? "Hide Amount" : "Show Amount"}
+                    >
+                      {showInvested ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  )}
                 </div>
-                <div className="text-xl font-bold tracking-tight text-foreground sm:text-2xl text-gray-600">
+                <div className={`text-xl font-bold tracking-tight text-foreground sm:text-2xl text-gray-600 transition-all duration-200 ${
+                  s.label === "Total Invested" && !showInvested ? "blur-[5px] select-none" : ""
+                }`}>
                   {s.value}
                 </div>
               </div>
@@ -178,14 +277,68 @@ function Dashboard() {
       {/* Charts row */}
       <div className="grid lg:grid-cols-3 gap-4 mb-6">
         <div className="bg-card rounded-xl border p-5 lg:col-span-2">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <div>
-              <h3 className="font-semibold">Revenue & Profit (Monthly)</h3>
-              <p className="text-xs text-muted-foreground">Daily sales trend</p>
+              <h3 className="font-semibold">Revenue & Profit ({viewMode === "yearly" ? "Yearly" : "Monthly"})</h3>
+              <p className="text-xs text-muted-foreground">{viewMode === "yearly" ? "Monthly sales breakdown" : "Daily sales trend"}</p>
             </div>
-            <div className="flex gap-3 text-xs">
-              <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" /> Revenue</span>
-              <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-success" /> Profit</span>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* View Mode Toggle Button */}
+              <div className="flex rounded-md border bg-muted p-0.5 animate-in fade-in duration-200">
+                <button
+                  onClick={() => setViewMode("yearly")}
+                  className={`px-3 py-1 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
+                    viewMode === "yearly"
+                      ? "bg-background text-foreground shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Yearly
+                </button>
+                <button
+                  onClick={() => setViewMode("monthly")}
+                  className={`px-3 py-1 rounded-sm text-xs font-semibold transition-all cursor-pointer ${
+                    viewMode === "monthly"
+                      ? "bg-background text-foreground shadow-sm font-bold"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  Monthly
+                </button>
+              </div>
+
+              {/* Year Dropdown */}
+              <select
+                className="px-2 py-1 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-foreground animate-in fade-in duration-200"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+              >
+                {years.map((y) => (
+                  <option key={y} value={y}>
+                    {y}
+                  </option>
+                ))}
+              </select>
+
+              {/* Month Dropdown (conditional) */}
+              {viewMode === "monthly" && (
+                <select
+                  className="px-2 py-1 rounded-md border bg-background text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer text-foreground animate-in fade-in duration-200"
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                >
+                  {MONTHS.map((m) => (
+                    <option key={m.value} value={m.value}>
+                      {m.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              <div className="flex gap-3 text-xs">
+                <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-primary" /> Revenue</span>
+                <span className="inline-flex items-center gap-1.5"><span className="size-2 rounded-full bg-success" /> Profit</span>
+              </div>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={260}>
@@ -201,7 +354,13 @@ function Dashboard() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="oklch(0.91 0.01 255)" vertical={false} />
-              <XAxis dataKey="day" tick={{ fontSize: 11, fill: "oklch(0.5 0.02 260)" }} tickLine={false} axisLine={false} />
+              <XAxis
+                dataKey="day"
+                tick={{ fontSize: 11, fill: "oklch(0.5 0.02 260)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => (viewMode === "yearly" ? v.substring(0, 3) : v.split(" ")[0])}
+              />
               <YAxis tick={{ fontSize: 11, fill: "oklch(0.5 0.02 260)" }} tickLine={false} axisLine={false} tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
               <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid oklch(0.91 0.01 255)", fontSize: 12 }} formatter={(v: number) => fmt(v)} />
               <Area type="monotone" dataKey="revenue" stroke={CHART_COLORS[0]} fill="url(#rev)" strokeWidth={2} />
